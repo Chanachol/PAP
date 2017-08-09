@@ -8,6 +8,6 @@ Name list
   - Pornchai  Khamdeang
   - Wachirachai Pongteudgrad
   
-![alt text][https://github.com/Chanachol/PAP/blob/master/images/finally%20circuit.jpg]
+![alt text](https://github.com/Chanachol/PAP/blob/master/images/finally%20circuit.jpg)
 
 
