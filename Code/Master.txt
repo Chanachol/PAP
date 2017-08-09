@@ -1,0 +1,247 @@
+﻿#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <ESP8266WiFi.h>
+#include <FirebaseArduino.h>
+#include <DHT.h>
+#include <ESP8266WiFiMulti.h>
+#include <ESP8266HTTPClient.h>
+
+//Thumbprint
+#define finger "‎AB A9 57 F2 4B 22 08 33 6A 21 9C 92 2D 19 88 D5 B2 1F 5C 8B"
+             
+//************************************************
+#include <BlynkSimpleEsp8266.h>
+//************************************************
+
+ESP8266WiFiMulti WiFiMulti;
+
+//************************************************
+/*#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+#define auth "c441ef8834824e90bcf0c8a91f5d24b6"
+#define ssid "Redmi"
+#define pass "23456789"*/
+#define ledPin D5 
+#define pirPin D7 //Input for HC-S501
+
+#define Mbeep D8
+//************************************************
+
+// sleep mode
+#define SECONDS_DS(seconds) ((seconds)*1000000UL)
+
+// Config Firebase
+#define FIREBASE_HOST "dbms-project-170012.firebaseio.com" //<------ เอามาจาก firebase ที่สมัครไป
+#define FIREBASE_AUTH "mIEFIFj4XseZ0mJnSvvHyUvqaz8LgvYJ3blm1uri" //<------ เอามาจาก firebase ที่สมัครไป
+
+// Config connect WiFi //<------------------------------------------------- wifi
+#define WIFI_SSID "COM8" //<------ wifi ที่ต้องการเชื่อมต่อ
+#define WIFI_PASSWORD "01234567890ab" //<------ wifi ที่ต้องการเชื่อมต่อ
+
+// Config DHT
+#define DHTPIN D4 //<------ ที่ใช้ในการเชื่อมต่อ DHT [sensor]
+#define DHTTYPE DHT22
+
+LiquidCrystal_I2C lcd(0x3F, 16, 2);
+DHT dht(DHTPIN, DHTTYPE);
+
+String name;
+int count=1;
+int count2=1;
+
+//************************************************
+int pirValue; // Place to store read PIR Value
+//************************************************
+
+void setup() {
+  //lcd.backlight();
+  lcd.begin();
+  Serial.begin(9600);
+  delay(500);
+
+  WiFi.mode(WIFI_STA);
+  // connect to wifi.
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("connecting");
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting");
+  delay(2000);
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".\n");
+    delay(500);
+  }
+  Serial.println();
+  Serial.print("connected: ");
+  Serial.println(WiFi.localIP());
+  lcd.setCursor(0, 1);
+  lcd.print(WiFi.localIP());
+  beep(200);
+  delay(2000);
+
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  dht.begin();
+  delay(1000);
+  lcd.clear();
+  
+//************************************************
+  /*lcd.setCursor(0, 0);
+  lcd.print("Connecting Blynk");
+  Serial.print("Connecting Blynk");
+  
+  delay(2000);
+  Blynk.begin(auth, ssid, pass);*/
+  pinMode(ledPin, OUTPUT);
+  pinMode(pirPin, INPUT);
+  digitalWrite(ledPin, LOW);
+
+  // declare pin D8 to be an output:
+  pinMode(Mbeep, OUTPUT);
+  beep(50);
+  beep(50);
+  beep(50);
+  delay(1000);
+  lcd.clear();
+//************************************************
+  
+}
+
+void loop() {
+
+  // Read temp & Humidity for DHT22
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  
+  if (isnan(h) || isnan(t)) {
+    /*Serial.println("Failed to read from DHT sensor!");
+    lcd.setCursor(0, 0);
+    lcd.print("Failed to read from DHT sensor!");
+    lcd.setCursor(0, 1);
+    lcd.print("from DHT sensor!");*/
+    
+    //delay(500);
+    //lcd.clear();
+    return;
+
+  }
+  
+  if(count == 30){
+    
+    if ((WiFiMulti.run() == WL_CONNECTED)) {
+    HTTPClient http;
+    String url = "https://kittikhunth.win/updata.php?temp="+String(t)+String("&humi=")+String(h);
+    Serial.println(url);
+    http.begin(url,finger); //HTTP
+
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+    Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+    if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.println(payload);
+    }
+    } else {
+    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+    }
+
+      
+  //JsonBuffer
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["temp"] = t;
+  root["humidity"] = h;
+  
+  // append a new value to /logDHT
+  String name = Firebase.push("Status-DHT", root);
+  // handle error
+  if (Firebase.failed()) {
+      Serial.print("pushing /Status-DHT failed:");
+      Serial.println(Firebase.error());  
+      return;
+  }
+  Serial.print("pushed: /Status-DHT");
+  Serial.println(name);
+  
+    count = 1;
+  }else{
+  count = count+1;
+  }
+  
+  // append a new value to /temperature
+   Firebase.setFloat("Main-DHT/temp", t);
+  if (Firebase.failed()) {
+      Serial.print("pushing /temp failed:");
+      Serial.println(Firebase.error());  
+      return;
+  }
+  Serial.print("pushed: /temp/");
+  Serial.println(Firebase.getFloat("Main-DHT/temp"));
+  lcd.setCursor(0, 0);
+  lcd.print("temp = ");lcd.print(t,1);lcd.print((char)223);lcd.print("C");
+
+  // append a new value to /humidity
+   Firebase.setFloat("Main-DHT/humidity", h);
+  
+  if (Firebase.failed()) {
+      Serial.print("pushing /humidity failed:");
+      Serial.println(Firebase.error());  
+      return;
+  }
+  Serial.print("pushed: /humidity/");
+  Serial.println(Firebase.getFloat("Main-DHT/humidity"));
+  lcd.setCursor(0, 1);
+  lcd.print("humidity = ");lcd.print(h,1);lcd.print("%");
+
+//************************************************
+  //Blynk.run();
+  getPirValue();
+//************************************************
+  
+  delay(500);
+  if(count2 == 60){
+    
+  //sleepmode
+  delay(500);
+  Serial.println("==>Sleeping Mode...");
+  lcd.clear();
+  lcd.setCursor(1, 0);
+  lcd.print("Sleeping Mode!");
+  lcd.setCursor(5, 1);
+  lcd.print("zzZZZ");
+  ESP.deepSleep(SECONDS_DS(10));
+
+  count2 = 1;
+  }else{
+  count2 = count2 + 1;
+  }
+  
+}
+
+//************************************************
+void getPirValue(void){
+  pirValue = digitalRead(pirPin);
+  if(pirValue) 
+  { 
+    Serial.println("==> Motion detected");
+    //Blynk.notify("Motion detected!!");
+    lcd.clear();
+    lcd.setCursor(5, 0);
+    lcd.print("Motion");
+    lcd.setCursor(3, 1);
+    lcd.print("Detected!!");
+    delay(1000);
+    lcd.clear();
+    beep(200); 
+  }
+  digitalWrite(ledPin, pirValue);
+}
+
+void beep(unsigned char delayms){
+  analogWrite(D8, 50);      // Almost any value can be used except 0 and 255
+                           // experiment to get the best tone
+  delay(delayms);          // wait for a delayms ms
+  analogWrite(D8, 0);       // 0 turns it off
+  delay(delayms);          // wait for a delayms ms   
+}
+//************************************************
