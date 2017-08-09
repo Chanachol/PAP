@@ -1,5 +1,6 @@
 # PAP
-Education
+Education....
+  From rajamungkala university of technology lanna chiangmai thailand.
 
 Name list
   - Chanachol Jommongkol
