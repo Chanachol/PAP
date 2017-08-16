@@ -6,7 +6,7 @@ Name list
   - Mr.Chanachol Jommongkol
   - Mr.Kittikhun Thakham
   - Mr.Pornchai  Khamdeang
-  - Mr.Wachirachai Pongteudgrad
+  - Mr.Wachirachai Pongtirdkiat
   
 ![alt text](https://github.com/Chanachol/PAP/blob/master/images/finally%20circuit.jpg)
                                     Successfuly
